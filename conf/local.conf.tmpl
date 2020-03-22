@@ -1,0 +1,55 @@
+DISTRO = "poky"
+
+SDKMACHINE = "x86_64"
+
+USER_CLASSES = "buildstats"
+
+PATCHRESOLVE = "noop"
+
+BB_DISKMON_DIRS = "\
+    STOPTASKS,${TMPDIR},1G,100K \
+    STOPTASKS,${DL_DIR},1G,100K \
+    STOPTASKS,${SSTATE_DIR},1G,100K \
+    ABORT,${TMPDIR},100M,1K \
+    ABORT,${DL_DIR},100M,1K \
+    ABORT,${SSTATE_DIR},100M,1K"
+
+CONF_VERSION = "1"
+
+
+CMAKE_MAKE_PROGRAM = "make"
+OECMAKE_GENERATOR = "Unix Makefiles"
+
+
+DISTRO_FEATURES_append = " systemd usbhost pci x11 opengl"
+DISTRO_FEATURES_remove = " 3g bluetooth nfc wifi"
+
+EXTRA_IMAGE_FEATURES += " hwcodecs"
+
+VIRTUAL-RUNTIME_init_manager = "systemd"
+VIRTUAL-RUNTIME_dev_manager = "systemd"
+DISTRO_FEATURES_BACKFILL_CONSIDERED = "sysvinit"
+
+SERIAL_CONSOLE = ""
+SERIAL_CONSOLES = ""
+
+USE_DEVFS = "1"
+
+PACKAGECONFIG_append_pn-systemd = " coredump networkd resolved"
+
+DEFAULT_TIMEZONE = "Europe/Berlin"
+
+IMAGE_LINGUAS = "de-de en-us"
+
+GLIBC_GENERATE_LOCALES = "de_DE.UTF-8 en_US.UTF-8"
+
+GRUB_TIMEOUT = "5"
+
+LICENSE_FLAGS_WHITELIST += "commercial"
+
+PREFERRED_PROVIDER_jpeg = "libjpeg-turbo"
+PREFERRED_PROVIDER_jpeg-native = "libjpeg-turbo-native"
+PREFERRED_PROVIDER_virtual/libgl = "mesa"
+
+INITRAMFS_IMAGE = "core-image-minimal-initramfs"
+INITRAMFS_IMAGE_BUNDLE = "1"

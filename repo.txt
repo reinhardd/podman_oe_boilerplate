@@ -1,0 +1,13 @@
+#
+# This file is directly parsed by grep sed and others
+#
+# layers to use -- dir relative to layers directory
+
+layer: poky/meta
+layer: poky/meta-poky
+layer: poky/meta-yocto-bsp
+layer: meta-openembedded/meta-oe
+layer: meta-openembedded/meta-python
+layer: meta-openembedded/meta-networking
+
+

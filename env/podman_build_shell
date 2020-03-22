@@ -1,0 +1,110 @@
+#!/bin/sh
+
+CALLED_FROM=$(pwd)
+
+ORIGIN="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+if [ "$_" == "$0" ]; then 
+    echo "Script should not be sourced"
+    return
+fi
+
+cd $ORIGIN/..
+
+echo "cd'd to $PWD"
+
+CWD=$(pwd)
+
+if [ ! -f podman.env ]; then
+    echo "$PWD/podman.env not found"
+    exit 1
+fi
+
+pwd
+ls
+source ./podman.env
+
+if [ "$USE_AS" != "" -a "$USE_AS" != "$USER" ]; then
+    echo "should be called as user $USE_AS"
+    exit 2
+fi
+
+PODMAN_IMG=$PODNAME"_img"
+
+CONTAINER_NAME=$PODMAN_IMG"_ctr"
+
+echo "IMG: $PODMAN_IMG CTR: $CONTAINER_NAME" 
+
+source $ORIGIN/lib/oe.sh
+
+podman images | grep -q ^localhost/$PODMAN_IMG
+if [ $? -ne 0 ]; then
+    echo "no podman image $PODMAN_IMG found"
+    echo " create one"
+    DFDIR=env
+    if [ "$DISTRO" != "" ]; then
+        DFDIR="env/$DISTRO"
+    fi
+    if [ ! -f $DFDIR/Dockerfile ]; then
+        echo "no docker file $DFDIR/Dockerfile found"
+        exit 3
+    fi
+    podman build -t $PODMAN_IMG --build-arg HOMEDIR=$CWD $DFDIR
+fi
+
+#
+# do not know if this is needed because bitbake does 
+# his own checks. But maybe namespaces cause some trouble ...
+#
+echo "test for a running $CONTAINER_NAME"
+podman ps | grep -q $CONTAINER_NAME$
+if [ $? -eq 0 ]; then
+    echo "builder already running"
+    exit 1
+fi
+
+VOLUMES="-v $CWD:$CWD"
+
+
+export FWD_PBBSHELL=$CWD/xtra_runner.env
+source ./build.env
+echo "$DL_DIR"
+if [ "$DL_DIR" != "" ]; then
+    if [ "$ADD_DIRS" != "" ]; then
+        ADD_DIRS="$ADD_DIRS,$DL_DIR"
+    else
+        ADD_DIRS=$DL_DIR
+    fi
+fi
+
+for ad in $(echo $ADD_DIRS | sed "s/,/ /g")
+do
+    # call your procedure/other scripts here below
+    echo "$ad:"
+    VOLUMES="$VOLUMES -v $ad:$ad"
+done
+
+echo "VOLUMES $VOLUMES"
+
+gen_bblayers_conf_sample 
+gen_local_conf_sample $DL_DIR ""
+
+#
+# create a script that starts the bitbake shell
+#
+echo "#!/bin/bash"                                       >xrunner
+echo "echo \"from runner\""                             >>xrunner
+echo "cd $CWD"                                          >>xrunner
+echo "export TEMPLATECONF=$PWD/conf"                    >>xrunner
+echo "export MACHINE=$MACHINE"                          >>xrunner
+echo "export BB_ENV_EXTRAWHITE=\"$BB_ENV_EXTRAWHITE\""  >>xrunner
+echo "bash --init-file env/bshell.env"                  >>xrunner
+chmod +x xrunner
+
+echo "run podman: podman run --rm -it --name $CONTAINER_NAME --userns=keep-id $VOLUMES $PODMAN_IMG /bin/bash $CWD/xrunner" 
+podman run --rm -it --name $CONTAINER_NAME --userns=keep-id $VOLUMES $PODMAN_IMG /bin/bash $CWD/xrunner
+echo "podman done" 
+mv xrunner .xrunner
+
+cd $CALLED_FROM
+

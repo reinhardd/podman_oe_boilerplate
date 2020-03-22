@@ -15,13 +15,16 @@ How to use
 
 example::
 
-    git clone git@github.com:reinhardd/podman_oe_boilerplate.git my_own_project
+    git clone https://github.com/reinhardd/podman_oe_boilerplate.git my_own_project
     cd my_own_project
     rm -rf .git
     git init .
-    git submodule add -b zeus git://git.yoctoproject.org/poky layers/poky
-    git submodule add -b zeus git://git.openembedded.org/meta-openembedded layers/meta-openembedded
-    cp build.env.sample
+    git submodule add --depth 1 -b zeus git://git.yoctoproject.org/poky layers/poky
+    git submodule add --depth 1 -b zeus git://git.openembedded.org/meta-openembedded layers/meta-openembedded
+    cp podman.env.sample podman.env
+    cp build.env.sample build.env
+    mkdir ../zeus_downloads
+    env/podman_build_shell
 
 
 

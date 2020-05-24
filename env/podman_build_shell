@@ -9,10 +9,11 @@ if [ "$_" == "$0" ]; then
     return
 fi
 
+PODMAN_RUN_CMD="$*" # pass everything through to buildsys
+
 cd $ORIGIN/..
 
 echo "cd'd to $PWD"
-
 CWD=$(pwd)
 
 if [ ! -f podman.env ]; then
@@ -20,9 +21,10 @@ if [ ! -f podman.env ]; then
     exit 1
 fi
 
-pwd
-ls
+export FWD_PBBSHELL=$CWD/xtra_runner.env
+
 source ./podman.env
+source ./build.env
 
 if [ "$USE_AS" != "" -a "$USE_AS" != "$USER" ]; then
     echo "should be called as user $USE_AS"
@@ -33,7 +35,7 @@ PODMAN_IMG=$PODNAME"_img"
 
 CONTAINER_NAME=$PODMAN_IMG"_ctr"
 
-echo "IMG: $PODMAN_IMG CTR: $CONTAINER_NAME" 
+printf "podman build-env\n\tIMG: $PODMAN_IMG \n\tCTR: $CONTAINER_NAME\n" 
 
 source $ORIGIN/lib/oe.sh
 
@@ -66,9 +68,23 @@ fi
 VOLUMES="-v $CWD:$CWD"
 
 
-export FWD_PBBSHELL=$CWD/xtra_runner.env
-source ./build.env
-echo "$DL_DIR"
+if [ "$USE_AS" != "" -a "$USE_AS" != "$USER" ]; then
+    echo "should be called as user $USE_AS"
+    exit 2
+fi
+
+#
+# create a possible 
+if [ -f ./bbimport.env ]; then
+    # echo "import bbimport.env"
+    source ./bbimport.env
+fi
+if [ "$PODMAN_SHELL_RUN_CMD" != "" ]; then
+    echo 'export BB_ENV_EXTRAWHITE="\$BB_ENV_EXTRAWHITE PODMAN_SHELL_RUN_CMD" ' >> "${FWD_PBBSHELL}"
+fi
+
+
+# echo "$DL_DIR"
 if [ "$DL_DIR" != "" ]; then
     if [ "$ADD_DIRS" != "" ]; then
         ADD_DIRS="$ADD_DIRS,$DL_DIR"
@@ -84,7 +100,7 @@ do
     VOLUMES="$VOLUMES -v $ad:$ad"
 done
 
-echo "VOLUMES $VOLUMES"
+# echo "VOLUMES $VOLUMES"
 
 gen_bblayers_conf_sample 
 gen_local_conf_sample $DL_DIR ""
@@ -92,19 +108,27 @@ gen_local_conf_sample $DL_DIR ""
 #
 # create a script that starts the bitbake shell
 #
-echo "#!/bin/bash"                                       >xrunner
-echo "echo \"from runner\""                             >>xrunner
-echo "cd $CWD"                                          >>xrunner
-echo "export TEMPLATECONF=$PWD/conf"                    >>xrunner
-echo "export MACHINE=$MACHINE"                          >>xrunner
-echo "export BB_ENV_EXTRAWHITE=\"$BB_ENV_EXTRAWHITE\""  >>xrunner
-echo "bash --init-file env/bshell.env"                  >>xrunner
+echo "#!/bin/bash"                                        >xrunner
+echo "echo \"from runner\""                              >>xrunner
+echo "export HOME=$CWD"                                  >>xrunner
+echo "cd $CWD"                                           >>xrunner
+echo "export TEMPLATECONF=$PWD/conf"                     >>xrunner
+echo "export MACHINE=$MACHINE"                           >>xrunner
+echo "export BB_ENV_EXTRAWHITE=\"$BB_ENV_EXTRAWHITE\""              >>xrunner
+if [ "$PODMAN_RUN_CMD" = "" ]; then
+    echo "bash --init-file env/bshell.env"                          >>xrunner
+else
+    echo "source env/bshell.env"                                    >>xrunner
+    echo "$PODMAN_RUN_CMD"                                          >>xrunner
+fi
+
 chmod +x xrunner
 
 echo "run podman: podman run --rm -it --name $CONTAINER_NAME --userns=keep-id $VOLUMES $PODMAN_IMG /bin/bash $CWD/xrunner" 
 podman run --rm -it --name $CONTAINER_NAME --userns=keep-id $VOLUMES $PODMAN_IMG /bin/bash $CWD/xrunner
-echo "podman done" 
+PRV=$?
+echo "podman done $PRV"
 mv xrunner .xrunner
 
 cd $CALLED_FROM
-
+exit $PRV
